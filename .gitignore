@@ -30,6 +30,7 @@ Thumbs.db
 
 # Logs
 *.log
+.env
 logs/
 
 # Node (for app-example)

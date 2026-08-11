@@ -1,0 +1,5 @@
+const SUPABASE_URL = 'https://api.aaryavtech.online'
+const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_FROM_ENV
+
+
+how i can get this  ??? from my supbase ?? or i need to get from the cloud supbase 

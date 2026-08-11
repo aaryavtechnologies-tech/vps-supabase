@@ -1,0 +1,33 @@
+# ============================================================
+# .gitattributes — Force LF line endings for shell scripts
+# This ensures .sh files are checked out with LF (not CRLF)
+# on Windows, so they run correctly on Linux VPS.
+# ============================================================
+
+# Default: normalize line endings to LF in repo
+* text=auto eol=lf
+
+# Shell scripts MUST be LF (will break with CRLF on Linux)
+*.sh text eol=lf
+
+# YAML files — LF
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# SQL files — LF
+*.sql text eol=lf
+
+# Config files — LF
+Caddyfile text eol=lf
+.env.example text eol=lf
+*.md text eol=lf
+*.ts text eol=lf
+*.html text eol=lf
+*.json text eol=lf
+
+# Binary files — no line ending conversion
+*.dump binary
+*.gz binary
+*.png binary
+*.jpg binary
+*.pdf binary

@@ -1,0 +1,38 @@
+# ============================================================
+# Git Ignore — Self-Hosted Supabase
+# NEVER commit real secrets to Git!
+# ============================================================
+
+# Real environment file — contains all secrets
+.env
+
+# Backup files — may contain sensitive data
+backups/
+*.dump
+*.sql.gz
+
+# Docker volumes on host (if bind-mounted)
+volumes/db/data/
+volumes/storage/
+
+# SSL certificates (managed by Caddy automatically)
+*.pem
+*.key
+*.crt
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Node (for app-example)
+app-example/node_modules/
+app-example/.next/
+app-example/dist/

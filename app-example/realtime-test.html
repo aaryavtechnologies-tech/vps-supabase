@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<!--
+  realtime-test.html — Supabase Realtime Test
+  =============================================
+  Tests live database updates between two browser tabs.
+  
+  How to use:
+  1. Deploy Supabase and create a table called "realtime_test" in Studio:
+     SQL:
+       CREATE TABLE public.realtime_test (
+         id SERIAL PRIMARY KEY,
+         message TEXT NOT NULL,
+         created_by TEXT DEFAULT 'browser',
+         created_at TIMESTAMPTZ DEFAULT now()
+       );
+       -- Enable Row Level Security (but allow all for testing)
+       ALTER TABLE public.realtime_test ENABLE ROW LEVEL SECURITY;
+       CREATE POLICY "Allow all for test" ON public.realtime_test FOR ALL USING (true);
+
+  2. Enable Realtime for this table:
+     In Studio → Database → Replication → supabase_realtime → Add table → realtime_test
+
+  3. Replace YOUR_ANON_KEY below with your ANON_KEY from .env
+
+  4. Open this file in TWO browser tabs (or two browsers)
+  5. Click "Insert Row" in Tab A
+  6. Watch Tab B receive the update instantly — no page refresh!
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supabase Realtime Test — aaryavtech.online</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: #0f0f1a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 1.75rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #3ecf8e, #1d4ed8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #94a3b8;
+      margin-bottom: 2rem;
+      font-size: 0.9rem;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      background: #1e1e2e;
+      border-radius: 8px;
+      margin-bottom: 1.5rem;
+      border: 1px solid #2d2d3d;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #64748b;
+      transition: background 0.3s;
+    }
+
+    .status-dot.connected { background: #3ecf8e; box-shadow: 0 0 8px #3ecf8e80; }
+    .status-dot.error { background: #ef4444; }
+    .status-dot.connecting { background: #f59e0b; animation: pulse 1s infinite; }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    #status-text { font-size: 0.875rem; color: #94a3b8; }
+
+    .controls {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    input {
+      padding: 0.75rem 1rem;
+      background: #1e1e2e;
+      border: 1px solid #2d2d3d;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    input:focus { border-color: #3ecf8e; }
+    input::placeholder { color: #475569; }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      background: linear-gradient(135deg, #3ecf8e, #059669);
+      border: none;
+      border-radius: 8px;
+      color: white;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+
+    button:hover { opacity: 0.9; transform: translateY(-1px); }
+    button:active { transform: translateY(0); }
+    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .btn-clear {
+      background: #1e1e2e;
+      border: 1px solid #2d2d3d;
+      color: #94a3b8;
+      padding: 0.5rem 1rem;
+      font-size: 0.8rem;
+    }
+
+    .panel {
+      background: #1e1e2e;
+      border: 1px solid #2d2d3d;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid #2d2d3d;
+      background: #16162a;
+    }
+
+    .panel-title {
+      font-weight: 600;
+      font-size: 0.9rem;
+      color: #e2e8f0;
+    }
+
+    .event-count {
+      background: #3ecf8e20;
+      color: #3ecf8e;
+      padding: 0.2rem 0.6rem;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    #events-list {
+      list-style: none;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+
+    .event-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid #1a1a2a;
+      animation: slideIn 0.3s ease;
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .event-item:last-child { border-bottom: none; }
+
+    .event-badge {
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .badge-INSERT { background: #3ecf8e20; color: #3ecf8e; }
+    .badge-UPDATE { background: #f59e0b20; color: #f59e0b; }
+    .badge-DELETE { background: #ef444420; color: #ef4444; }
+    .badge-CONNECTED { background: #3b82f620; color: #3b82f6; }
+    .badge-ERROR { background: #ef444420; color: #ef4444; }
+    .badge-INFO { background: #6366f120; color: #6366f1; }
+
+    .event-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .event-message {
+      font-size: 0.875rem;
+      color: #e2e8f0;
+      word-break: break-all;
+    }
+
+    .event-time {
+      font-size: 0.75rem;
+      color: #475569;
+      margin-top: 0.25rem;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 3rem;
+      color: #475569;
+    }
+
+    .empty-state svg {
+      margin: 0 auto 1rem;
+      display: block;
+      opacity: 0.4;
+    }
+
+    .config-notice {
+      background: #1d1d2e;
+      border: 1px solid #2563eb40;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-bottom: 1.5rem;
+      font-size: 0.85rem;
+      color: #94a3b8;
+    }
+
+    .config-notice code {
+      background: #0f0f1a;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      color: #3ecf8e;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Supabase Realtime Test</h1>
+    <p class="subtitle">aaryavtech.online — Self-hosted Supabase</p>
+
+    <div class="config-notice">
+      ⚙️ <strong>Setup required:</strong>
+      Replace <code>YOUR_ANON_KEY</code> in this file with your <code>ANON_KEY</code> from <code>.env</code>.
+      Also ensure you have created the <code>realtime_test</code> table and enabled Realtime for it in Studio.
+    </div>
+
+    <div class="status-bar">
+      <div class="status-dot connecting" id="status-dot"></div>
+      <span id="status-text">Connecting to Supabase Realtime...</span>
+    </div>
+
+    <div class="controls">
+      <input
+        id="message-input"
+        type="text"
+        placeholder="Enter a test message (e.g. 'Driver arrived at location')"
+        value="Hello from browser!"
+      />
+      <button id="insert-btn" onclick="insertRow()" disabled>
+        ➕ Insert Row
+      </button>
+    </div>
+    <div style="display:flex; gap:0.5rem; margin-bottom:1.5rem;">
+      <button class="btn-clear" onclick="clearEvents()">🗑 Clear log</button>
+      <button class="btn-clear" onclick="deleteAllRows()" style="color:#ef4444; border-color:#ef444440;">
+        🗑 Delete all DB rows
+      </button>
+    </div>
+
+    <div class="panel">
+      <div class="panel-header">
+        <span class="panel-title">📡 Realtime Events</span>
+        <span class="event-count" id="event-count">0 events</span>
+      </div>
+      <ul id="events-list">
+        <li class="event-item">
+          <span class="event-badge badge-INFO">INFO</span>
+          <div class="event-content">
+            <div class="event-message">Waiting for Supabase connection...</div>
+            <div class="event-time">Open this page in two tabs to test realtime sync</div>
+          </div>
+        </li>
+      </ul>
+    </div>
+  </div>
+
+  <script>
+    // ─── Configuration ────────────────────────────────────────
+    const SUPABASE_URL = 'https://api.aaryavtech.online'
+    const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY'  // ← Replace this!
+    const TABLE_NAME = 'realtime_test'
+
+    // ─── Initialize Supabase ──────────────────────────────────
+    const { createClient } = supabase
+    const client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+
+    let eventCount = 0
+    const statusDot = document.getElementById('status-dot')
+    const statusText = document.getElementById('status-text')
+    const insertBtn = document.getElementById('insert-btn')
+    const eventsList = document.getElementById('events-list')
+    const eventCountEl = document.getElementById('event-count')
+
+    function addEvent(type, message, detail = '') {
+      // Remove empty state if present
+      const emptyState = eventsList.querySelector('.empty-state')
+      if (emptyState) emptyState.remove()
+
+      eventCount++
+      eventCountEl.textContent = `${eventCount} events`
+
+      const item = document.createElement('li')
+      item.className = 'event-item'
+      item.innerHTML = `
+        <span class="event-badge badge-${type}">${type}</span>
+        <div class="event-content">
+          <div class="event-message">${escapeHtml(message)}</div>
+          ${detail ? `<div class="event-time">${escapeHtml(detail)}</div>` : ''}
+          <div class="event-time">${new Date().toLocaleTimeString()}</div>
+        </div>
+      `
+      // Prepend so newest events appear at top
+      eventsList.insertBefore(item, eventsList.firstChild)
+
+      // Keep only last 100 events
+      while (eventsList.children.length > 100) {
+        eventsList.removeChild(eventsList.lastChild)
+      }
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement('div')
+      div.appendChild(document.createTextNode(String(str)))
+      return div.innerHTML
+    }
+
+    function clearEvents() {
+      eventsList.innerHTML = ''
+      eventCount = 0
+      eventCountEl.textContent = '0 events'
+    }
+
+    // ─── Subscribe to realtime changes ────────────────────────
+    const channel = client
+      .channel('realtime-test-channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: TABLE_NAME },
+        (payload) => {
+          const { eventType, new: newRow, old: oldRow } = payload
+
+          if (eventType === 'INSERT') {
+            addEvent('INSERT',
+              `New row: "${newRow.message}"`,
+              `ID: ${newRow.id} | created_by: ${newRow.created_by}`
+            )
+          } else if (eventType === 'UPDATE') {
+            addEvent('UPDATE',
+              `Row ${newRow.id} updated: "${newRow.message}"`,
+              `created_by: ${newRow.created_by}`
+            )
+          } else if (eventType === 'DELETE') {
+            addEvent('DELETE',
+              `Row deleted: ID ${oldRow.id}`,
+              `Was: "${oldRow.message}"`
+            )
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status === 'SUBSCRIBED') {
+          statusDot.className = 'status-dot connected'
+          statusText.textContent = '✅ Connected to Supabase Realtime — listening for changes'
+          insertBtn.disabled = false
+          addEvent('CONNECTED', 'Realtime channel connected!',
+            'Open this page in another tab and insert a row — you\'ll see it appear here instantly.')
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          statusDot.className = 'status-dot error'
+          statusText.textContent = `❌ Realtime error: ${status}`
+          addEvent('ERROR', `Connection error: ${status}`,
+            err ? err.message : 'Check your ANON_KEY and that Realtime is enabled for this table.')
+        } else {
+          statusDot.className = 'status-dot connecting'
+          statusText.textContent = `Connecting... (${status})`
+        }
+      })
+
+    // ─── Insert a row ─────────────────────────────────────────
+    async function insertRow() {
+      const input = document.getElementById('message-input')
+      const message = input.value.trim()
+      if (!message) {
+        input.focus()
+        return
+      }
+
+      insertBtn.disabled = true
+      insertBtn.textContent = 'Inserting...'
+
+      try {
+        const { data, error } = await client
+          .from(TABLE_NAME)
+          .insert({ message, created_by: 'browser-test' })
+          .select()
+          .single()
+
+        if (error) throw error
+
+        input.value = ''
+        console.log('Inserted:', data)
+      } catch (err) {
+        addEvent('ERROR', `Insert failed: ${err.message}`,
+          'Make sure the table exists and RLS allows inserts.')
+      } finally {
+        insertBtn.disabled = false
+        insertBtn.textContent = '➕ Insert Row'
+      }
+    }
+
+    // ─── Delete all rows ──────────────────────────────────────
+    async function deleteAllRows() {
+      if (!confirm('Delete all rows from realtime_test table?')) return
+      const { error } = await client
+        .from(TABLE_NAME)
+        .delete()
+        .neq('id', 0)  // delete where id != 0 (all rows)
+      if (error) {
+        addEvent('ERROR', `Delete failed: ${error.message}`)
+      }
+    }
+
+    // ─── Allow Enter key to insert ────────────────────────────
+    document.getElementById('message-input').addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') insertRow()
+    })
+  </script>
+</body>
+</html>

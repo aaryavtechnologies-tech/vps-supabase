@@ -1,0 +1,122 @@
+# ============================================================
+# Caddyfile — Reverse Proxy for aaryavtech.online
+# Caddy automatically provisions Let's Encrypt TLS certs.
+#
+# Subdomains this handles:
+#   supabase.aaryavtech.online  →  Supabase Studio (via Envoy)
+#   api.aaryavtech.online       →  Supabase API (via Envoy)
+#
+# Requirements:
+#   - DNS A records must point to this VPS BEFORE starting Caddy
+#   - Ports 80 and 443 must be open in your firewall
+# ============================================================
+
+# Global options
+{
+    # Use Let's Encrypt production CA (comment out to test with staging)
+    # email is required for Let's Encrypt notifications
+    email admin@aaryavtech.online
+
+    # Enable admin API only on localhost
+    admin localhost:2019
+
+    # Uncomment the next line to use Let's Encrypt staging (for testing)
+    # acme_ca https://acme-staging-v02.api.letsencrypt.org/directory
+}
+
+# ──────────────────────────────────────────────────────────
+# Supabase Studio
+# https://supabase.aaryavtech.online → Studio UI
+# ──────────────────────────────────────────────────────────
+supabase.aaryavtech.online {
+    # Proxy to Envoy gateway which serves Studio at /
+    reverse_proxy localhost:8000 {
+        # Pass real client IP to backend
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+
+        # Health check
+        health_uri /health
+        health_interval 30s
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "SAMEORIGIN"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+
+    # Access logs
+    log {
+        output file /var/log/caddy/supabase-studio.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}
+
+# ──────────────────────────────────────────────────────────
+# Supabase API Gateway
+# https://api.aaryavtech.online → All Supabase API endpoints
+#
+# Endpoints available:
+#   /rest/v1/       - PostgREST auto-generated API
+#   /auth/v1/       - GoTrue authentication
+#   /storage/v1/    - Supabase Storage
+#   /realtime/v1/   - WebSocket/Realtime (includes WS upgrade)
+#   /functions/v1/  - Edge Functions
+# ──────────────────────────────────────────────────────────
+api.aaryavtech.online {
+    reverse_proxy localhost:8000 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+        header_up Host {host}
+
+        # Important: Flush immediately for SSE / realtime streams
+        flush_interval -1
+
+        # WebSocket upgrade (required for Supabase Realtime)
+        transport http {
+            dial_timeout 10s
+            response_header_timeout 0s
+            read_buffer_size 16kb
+            write_buffer_size 16kb
+        }
+    }
+
+    # CORS headers for API access from browsers/apps
+    header {
+        Access-Control-Allow-Origin *
+        Access-Control-Allow-Methods "GET, POST, PUT, PATCH, DELETE, OPTIONS"
+        Access-Control-Allow-Headers "Authorization, Content-Type, apikey, x-client-info"
+        Access-Control-Max-Age "86400"
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+        X-Content-Type-Options "nosniff"
+        -Server
+    }
+
+    # Handle OPTIONS preflight requests
+    @options method OPTIONS
+    respond @options 204
+
+    log {
+        output file /var/log/caddy/supabase-api.log {
+            roll_size 10mb
+            roll_keep 5
+        }
+    }
+}
+
+# ──────────────────────────────────────────────────────────
+# HTTP → HTTPS redirect (Caddy handles this automatically,
+# but explicit for clarity)
+# ──────────────────────────────────────────────────────────
+http://supabase.aaryavtech.online, http://api.aaryavtech.online {
+    redir https://{host}{uri} permanent
+}

@@ -60,22 +60,29 @@ if [[ $DISK_AVAIL -lt 20 ]]; then
   err "Less than 20GB disk space available (${DISK_AVAIL}GB). Please free up space."
 fi
 
-# Port checks
-PORTS_IN_USE=""
-for port in 80 443; do
-  if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
-    PORTS_IN_USE="$PORTS_IN_USE $port"
-  fi
-done
+# Web server checks (Nginx / Caddy)
+USE_NGINX=false
+if systemctl is-active --quiet nginx; then
+  log "Nginx is running on this server. We will configure Nginx instead of Caddy."
+  USE_NGINX=true
+else
+  # Port checks for Caddy
+  PORTS_IN_USE=""
+  for port in 80 443; do
+    if ss -tlnp 2>/dev/null | grep -q ":${port} "; then
+      PORTS_IN_USE="$PORTS_IN_USE $port"
+    fi
+  done
 
-if [[ -n "$PORTS_IN_USE" ]]; then
-  warn "Ports${PORTS_IN_USE} are currently in use."
-  warn "Checking which service is using them..."
-  ss -tlnp | grep -E ":(80|443) " || true
-  echo ""
-  read -r -p "Stop conflicting services and continue? [y/N] " CONFIRM
-  [[ "$CONFIRM" == "y" || "$CONFIRM" == "Y" ]] || err "Aborted. Free ports 80/443 first."
-  sudo systemctl stop nginx apache2 2>/dev/null || true
+  if [[ -n "$PORTS_IN_USE" ]]; then
+    warn "Ports${PORTS_IN_USE} are currently in use."
+    warn "Checking which service is using them..."
+    ss -tlnp | grep -E ":(80|443) " || true
+    echo ""
+    read -r -p "Stop conflicting services and continue with Caddy? [y/N] " CONFIRM
+    [[ "$CONFIRM" == "y" || "$CONFIRM" == "Y" ]] || err "Aborted. Free ports 80/443 first."
+    sudo systemctl stop nginx apache2 2>/dev/null || true
+  fi
 fi
 
 ok "Pre-flight checks passed."
@@ -106,21 +113,25 @@ COMPOSE_VER=$(docker compose version)
 ok "Docker Compose: $COMPOSE_VER"
 
 # ──────────────────────────────────────────────────────────
-step "Step 3/10 — Install Caddy"
+step "Step 3/10 — Install Web Server"
 # ──────────────────────────────────────────────────────────
 
-if command -v caddy &>/dev/null; then
-  ok "Caddy already installed: $(caddy version)"
+if [[ "$USE_NGINX" == "true" ]]; then
+  ok "Using existing Nginx installation."
 else
-  log "Installing Caddy..."
-  sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
-    | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-  curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
-    | sudo tee /etc/apt/sources.list.d/caddy-stable.list
-  sudo apt-get update -q
-  sudo apt-get install -y caddy
-  ok "Caddy installed: $(caddy version)"
+  if command -v caddy &>/dev/null; then
+    ok "Caddy already installed: $(caddy version)"
+  else
+    log "Installing Caddy..."
+    sudo apt-get install -y debian-keyring debian-archive-keyring apt-transport-https curl
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' \
+      | sudo gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
+    curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' \
+      | sudo tee /etc/apt/sources.list.d/caddy-stable.list
+    sudo apt-get update -q
+    sudo apt-get install -y caddy
+    ok "Caddy installed: $(caddy version)"
+  fi
 fi
 
 # ──────────────────────────────────────────────────────────
@@ -177,25 +188,43 @@ chmod +x "$SCRIPT_DIR/scripts/"*.sh
 ok "Directories created."
 
 # ──────────────────────────────────────────────────────────
-step "Step 7/10 — Configure Caddy"
+step "Step 7/10 — Configure Web Server"
 # ──────────────────────────────────────────────────────────
 
-sudo cp "$SCRIPT_DIR/Caddyfile" /etc/caddy/Caddyfile
-
-sudo mkdir -p /var/log/caddy
-sudo chown caddy:caddy /var/log/caddy 2>/dev/null || sudo chown www-data:www-data /var/log/caddy 2>/dev/null || true
-
-# Validate Caddyfile
-if sudo caddy validate --config /etc/caddy/Caddyfile; then
-  ok "Caddyfile is valid."
+if [[ "$USE_NGINX" == "true" ]]; then
+  log "Configuring Nginx..."
+  sudo cp "$SCRIPT_DIR/nginx/supabase.conf" /etc/nginx/sites-available/supabase
+  sudo ln -sf /etc/nginx/sites-available/supabase /etc/nginx/sites-enabled/supabase
+  
+  if sudo nginx -t; then
+    ok "Nginx configuration is valid."
+    sudo systemctl reload nginx
+    ok "Nginx reloaded."
+    warn "You must manually request SSL certificates for Nginx:"
+    warn "  sudo apt install -y certbot python3-certbot-nginx"
+    warn "  sudo certbot --nginx -d supabase.aaryavtech.online -d api.aaryavtech.online"
+  else
+    err "Nginx configuration failed! Check /etc/nginx/sites-available/supabase"
+  fi
 else
-  err "Caddyfile validation failed! Check /etc/caddy/Caddyfile"
-fi
+  log "Configuring Caddy..."
+  sudo cp "$SCRIPT_DIR/Caddyfile" /etc/caddy/Caddyfile
 
-# Enable and start Caddy
-sudo systemctl enable caddy
-sudo systemctl restart caddy
-ok "Caddy started."
+  sudo mkdir -p /var/log/caddy
+  sudo chown caddy:caddy /var/log/caddy 2>/dev/null || sudo chown www-data:www-data /var/log/caddy 2>/dev/null || true
+
+  # Validate Caddyfile
+  if sudo caddy validate --config /etc/caddy/Caddyfile; then
+    ok "Caddyfile is valid."
+  else
+    err "Caddyfile validation failed! Check /etc/caddy/Caddyfile"
+  fi
+
+  # Enable and start Caddy
+  sudo systemctl enable caddy
+  sudo systemctl restart caddy
+  ok "Caddy started."
+fi
 
 # ──────────────────────────────────────────────────────────
 step "Step 8/10 — Start Supabase"

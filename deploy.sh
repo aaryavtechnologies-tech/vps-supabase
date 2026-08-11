@@ -106,7 +106,16 @@ fi
 
 if ! docker compose version &>/dev/null; then
   log "Installing Docker Compose plugin..."
-  sudo apt-get install -y docker-compose-plugin
+  if apt-cache search docker-compose-plugin | grep -q docker-compose-plugin; then
+    sudo apt-get install -y docker-compose-plugin
+  elif apt-cache search docker-compose-v2 | grep -q docker-compose-v2; then
+    sudo apt-get install -y docker-compose-v2
+  else
+    log "Downloading Docker Compose binary directly..."
+    sudo mkdir -p /usr/local/lib/docker/cli-plugins
+    sudo curl -SL https://github.com/docker/compose/releases/latest/download/docker-compose-linux-x86_64 -o /usr/local/lib/docker/cli-plugins/docker-compose
+    sudo chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+  fi
 fi
 
 COMPOSE_VER=$(docker compose version)

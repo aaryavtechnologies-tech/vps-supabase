@@ -318,50 +318,6 @@ services:
       - ./volumes/functions:/home/deno/functions:Z
 
   # ──────────────────────────────────────────────────
-  # Logflare / Analytics — Log collection & analytics
-  # ──────────────────────────────────────────────────
-  analytics:
-    container_name: supabase-analytics
-    image: supabase/logflare:1.4.0
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "http://localhost:4000/health"]
-      timeout: 5s
-      interval: 5s
-      retries: 10
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      LOGFLARE_NODE_HOST: 127.0.0.1
-      DB_USERNAME: supabase_admin
-      DB_DATABASE: ${POSTGRES_DB}
-      DB_HOSTNAME: ${POSTGRES_HOST}
-      DB_PORT: ${POSTGRES_PORT}
-      DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_SCHEMA: _analytics
-      LOGFLARE_API_KEY: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-      LOGFLARE_SINGLE_TENANT: "true"
-      LOGFLARE_SUPABASE_MODE: "true"
-      LOGFLARE_MIN_CLUSTER_SIZE: 1
-      RELEASE_COOKIE: ${SECRET_KEY_BASE}
-
-  # ──────────────────────────────────────────────────
-  # Vector — Log aggregation (forwards logs to Logflare)
-  # ──────────────────────────────────────────────────
-  vector:
-    container_name: supabase-vector
-    image: timberio/vector:0.28.1-alpine
-    restart: unless-stopped
-    depends_on:
-      analytics:
-        condition: service_healthy
-    volumes:
-      - ./volumes/logs/vector.yml:/etc/vector/vector.yml:ro
-      - /var/run/docker.sock:/var/run/docker.sock:ro
-    command: ["--config", "/etc/vector/vector.yml"]
-
-  # ──────────────────────────────────────────────────
   # Supavisor — Postgres connection pooler
   # ──────────────────────────────────────────────────
   supavisor:
@@ -370,8 +326,6 @@ services:
     restart: unless-stopped
     depends_on:
       db:
-        condition: service_healthy
-      analytics:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-sSfL", "--head", "-o", "/dev/null", "http://localhost:4001/api/health"]
@@ -395,8 +349,6 @@ services:
       METRICS_JWT_SECRET: ${JWT_SECRET}
       REGION: local
       ERL_AFLAGS: -proto_dist inet_tcp
-      LOGFLARE_API_KEY: ${LOGFLARE_PUBLIC_ACCESS_TOKEN}
-      LOGFLARE_BACKEND_URL: http://analytics:4000
 
   # ──────────────────────────────────────────────────
   # PostgreSQL 17 — Primary database

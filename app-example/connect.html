@@ -1,0 +1,991 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Connect to Supabase — aaryavtech.online</title>
+  <meta name="description" content="Connection guide and AI prompts for integrating with the self-hosted Supabase instance at aaryavtech.online" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:        #0a0a14;
+      --surface:   #12121f;
+      --card:      #16162a;
+      --border:    #2a2a40;
+      --border2:   #1e1e34;
+      --green:     #3ecf8e;
+      --green-dim: #3ecf8e18;
+      --blue:      #3b82f6;
+      --blue-dim:  #3b82f618;
+      --purple:    #8b5cf6;
+      --purple-dim:#8b5cf618;
+      --orange:    #f59e0b;
+      --orange-dim:#f59e0b18;
+      --pink:      #ec4899;
+      --pink-dim:  #ec489918;
+      --text:      #e2e8f0;
+      --text-muted:#64748b;
+      --text-dim:  #94a3b8;
+      --radius:    12px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--bg); }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    /* ── Layout ── */
+    .hero {
+      background: linear-gradient(135deg, #0a0a14 0%, #0f0f2a 50%, #0a0a14 100%);
+      border-bottom: 1px solid var(--border);
+      padding: 4rem 2rem 3rem;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 60% at 50% -20%, #3ecf8e0f, transparent),
+        radial-gradient(ellipse 50% 40% at 80% 80%, #3b82f60a, transparent);
+      pointer-events: none;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--green-dim);
+      border: 1px solid #3ecf8e30;
+      color: var(--green);
+      padding: 0.35rem 0.9rem;
+      border-radius: 999px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.03em;
+    }
+
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      line-height: 1.15;
+      background: linear-gradient(135deg, #fff 0%, #3ecf8e 50%, #3b82f6 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 1rem;
+    }
+
+    .hero p {
+      color: var(--text-dim);
+      font-size: 1.1rem;
+      max-width: 600px;
+      margin: 0 auto 2rem;
+    }
+
+    .url-bar {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.6rem 1.1rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.9rem;
+      color: var(--green);
+    }
+
+    .url-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); }
+
+    .container {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 3rem 2rem;
+    }
+
+    /* ── Section header ── */
+    .section-label {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .section-label h2 {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .tag {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      padding: 0.25rem 0.6rem;
+      border-radius: 6px;
+    }
+
+    /* ── Cards grid ── */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 1.25rem; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.25rem; }
+    @media (max-width: 768px) {
+      .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      position: relative;
+      transition: border-color 0.2s, transform 0.2s;
+    }
+
+    .card:hover { border-color: var(--border2); transform: translateY(-2px); }
+
+    .card-icon {
+      width: 40px; height: 40px;
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.2rem;
+      margin-bottom: 0.875rem;
+    }
+
+    .card h3 { font-size: 0.95rem; font-weight: 600; margin-bottom: 0.4rem; }
+    .card p  { font-size: 0.825rem; color: var(--text-muted); line-height: 1.5; }
+
+    /* ── Env info cards ── */
+    .env-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    .env-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.875rem 1.25rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .env-card-header .label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-muted);
+    }
+
+    .env-card-body {
+      padding: 1rem 1.25rem;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.85rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+
+    .env-value {
+      color: var(--green);
+      word-break: break-all;
+      flex: 1;
+    }
+
+    .env-value.secret { color: var(--text-muted); letter-spacing: 0.1em; }
+
+    /* ── Code blocks ── */
+    .code-block {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      overflow: hidden;
+      margin-bottom: 1.25rem;
+    }
+
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.7rem 1rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--card);
+    }
+
+    .code-filename {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-dim);
+    }
+
+    .lang-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    pre {
+      padding: 1.25rem;
+      overflow-x: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.82rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+    }
+
+    pre .kw  { color: #c792ea; }  /* keyword */
+    pre .str { color: #c3e88d; }  /* string */
+    pre .fn  { color: #82aaff; }  /* function */
+    pre .cm  { color: #546e7a; font-style: italic; }  /* comment */
+    pre .var { color: #ffcb6b; }  /* variable */
+    pre .val { color: #3ecf8e; }  /* value/url */
+    pre .tp  { color: #f78c6c; }  /* type */
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 0.25rem;
+      margin-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      padding: 0.6rem 1.1rem;
+      background: none;
+      border: none;
+      border-bottom: 2px solid transparent;
+      color: var(--text-muted);
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: color 0.2s, border-color 0.2s;
+      margin-bottom: -1px;
+    }
+
+    .tab-btn:hover { color: var(--text-dim); }
+    .tab-btn.active { color: var(--green); border-bottom-color: var(--green); }
+
+    .tab-content { display: none; }
+    .tab-content.active { display: block; }
+
+    /* ── Prompt boxes (AI prompts) ── */
+    .prompt-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--purple);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      line-height: 1.7;
+      color: var(--text-dim);
+      position: relative;
+    }
+
+    .prompt-box .prompt-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--purple);
+      margin-bottom: 0.6rem;
+      display: block;
+    }
+
+    .prompt-box .highlight { color: var(--green); font-family: 'JetBrains Mono', monospace; background: var(--green-dim); padding: 0.1rem 0.4rem; border-radius: 4px; }
+
+    /* ── Copy button ── */
+    .copy-btn {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      padding: 0.4rem 0.8rem;
+      background: var(--border);
+      border: none;
+      border-radius: 6px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .copy-btn:hover { background: var(--green-dim); color: var(--green); }
+    .copy-btn.copied { background: var(--green-dim); color: var(--green); }
+
+    /* ── Endpoint list ── */
+    .endpoint-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border2);
+      font-size: 0.85rem;
+    }
+
+    .endpoint-row:last-child { border-bottom: none; }
+
+    .method-badge {
+      font-size: 0.68rem;
+      font-weight: 700;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      min-width: 50px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .endpoint-path {
+      font-family: 'JetBrains Mono', monospace;
+      color: var(--text-dim);
+      flex: 1;
+    }
+
+    .endpoint-desc { color: var(--text-muted); font-size: 0.78rem; flex-shrink: 0; }
+
+    /* ── Alert ── */
+    .alert {
+      display: flex;
+      gap: 0.875rem;
+      padding: 1rem 1.25rem;
+      border-radius: var(--radius);
+      margin-bottom: 1.5rem;
+      font-size: 0.875rem;
+    }
+
+    .alert-warning { background: #f59e0b0d; border: 1px solid #f59e0b25; color: var(--text-dim); }
+    .alert-info    { background: #3b82f60d; border: 1px solid #3b82f625; color: var(--text-dim); }
+    .alert-success { background: var(--green-dim); border: 1px solid #3ecf8e25; color: var(--text-dim); }
+
+    .alert-icon { font-size: 1rem; flex-shrink: 0; margin-top: 0.1rem; }
+
+    /* ── Divider ── */
+    .divider { border: none; border-top: 1px solid var(--border); margin: 3rem 0; }
+
+    /* ── Footer ── */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-muted);
+      font-size: 0.8rem;
+      border-top: 1px solid var(--border);
+    }
+
+    footer a { color: var(--green); text-decoration: none; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════
+     HERO
+════════════════════════════════════════════════════════ -->
+<div class="hero">
+  <div class="hero-badge">
+    <span class="url-dot"></span>
+    Self-Hosted · aaryavtech.online
+  </div>
+  <h1>Connect Your App<br/>to Supabase</h1>
+  <p>Everything an AI coder needs — connection strings, API keys, code examples, and ready-to-paste AI prompts for any framework.</p>
+  <div class="url-bar">
+    <span class="url-dot"></span>
+    https://api.aaryavtech.online
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 1 — Connection Details
+  ════════════════════════════════════════════════════ -->
+  <div class="section-label">
+    <h2>🔑 Connection Details</h2>
+    <span class="tag" style="background:var(--green-dim);color:var(--green)">Copy These</span>
+  </div>
+
+  <div class="alert alert-warning">
+    <span class="alert-icon">⚠️</span>
+    <div>
+      <strong>Get your ANON_KEY from the VPS:</strong>
+      SSH into your VPS and run <code style="background:var(--card);padding:0.1rem 0.4rem;border-radius:4px;font-family:'JetBrains Mono',monospace;font-size:0.85em">grep ANON_KEY /root/supabase/.env</code>
+      — then paste it below and save this page locally. Never commit the key to public repos.
+    </div>
+  </div>
+
+  <div class="env-card">
+    <div class="env-card-header">
+      <span class="label">SUPABASE_URL &nbsp;·&nbsp; safe for frontend</span>
+      <button class="copy-btn" onclick="copyText('https://api.aaryavtech.online', this)">
+        📋 Copy
+      </button>
+    </div>
+    <div class="env-card-body">
+      <span class="env-value">https://api.aaryavtech.online</span>
+    </div>
+  </div>
+
+  <div class="env-card">
+    <div class="env-card-header">
+      <span class="label">ANON_KEY (publishable) &nbsp;·&nbsp; safe for frontend</span>
+      <button class="copy-btn" id="anon-copy-btn" onclick="copyText(document.getElementById('anon-key-val').textContent, this)">
+        📋 Copy
+      </button>
+    </div>
+    <div class="env-card-body">
+      <span class="env-value" id="anon-key-val">PASTE_YOUR_ANON_KEY_HERE</span>
+      <button onclick="editKey('anon-key-val')" style="background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:0.8rem;padding:0.2rem 0.5rem;border-radius:4px;border:1px solid var(--border);">✏️ Edit</button>
+    </div>
+  </div>
+
+  <div class="env-card">
+    <div class="env-card-header">
+      <span class="label" style="color:#ef4444">SERVICE_ROLE_KEY &nbsp;·&nbsp; ⛔ NEVER use in frontend / client code</span>
+    </div>
+    <div class="env-card-body">
+      <span class="env-value secret">●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●●</span>
+      <span style="font-size:0.75rem;color:var(--text-muted)">Server-side only</span>
+    </div>
+  </div>
+
+  <!-- ── Environment file template ── -->
+  <div class="code-block">
+    <div class="code-header">
+      <div class="code-filename">
+        <span>📄</span> .env (or .env.local for Next.js)
+      </div>
+      <button class="copy-btn" onclick="copyBlock('env-block', this)">📋 Copy</button>
+    </div>
+    <pre id="env-block"><span class="cm"># Supabase — aaryavtech.online (self-hosted)</span>
+<span class="var">NEXT_PUBLIC_SUPABASE_URL</span>=<span class="val">https://api.aaryavtech.online</span>
+<span class="var">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>=<span class="val">YOUR_ANON_KEY</span>
+
+<span class="cm"># Vite projects use VITE_ prefix instead:</span>
+<span class="var">VITE_SUPABASE_URL</span>=<span class="val">https://api.aaryavtech.online</span>
+<span class="var">VITE_SUPABASE_ANON_KEY</span>=<span class="val">YOUR_ANON_KEY</span>
+
+<span class="cm"># Server-side only (NEVER expose in browser):</span>
+<span class="var">SUPABASE_SERVICE_ROLE_KEY</span>=<span class="val">YOUR_SERVICE_ROLE_KEY</span></pre>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 2 — API Endpoints
+  ════════════════════════════════════════════════════ -->
+  <div class="section-label">
+    <h2>🌐 API Endpoints</h2>
+    <span class="tag" style="background:var(--blue-dim);color:var(--blue)">Reference</span>
+  </div>
+
+  <div class="card" style="margin-bottom:1.5rem;padding:0;">
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--green-dim);color:var(--green)">REST</span>
+      <span class="endpoint-path">https://api.aaryavtech.online/rest/v1/</span>
+      <span class="endpoint-desc">PostgREST auto-generated API</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--blue-dim);color:var(--blue)">AUTH</span>
+      <span class="endpoint-path">https://api.aaryavtech.online/auth/v1/</span>
+      <span class="endpoint-desc">Authentication (GoTrue)</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--orange-dim);color:var(--orange)">WS</span>
+      <span class="endpoint-path">https://api.aaryavtech.online/realtime/v1/</span>
+      <span class="endpoint-desc">WebSocket Realtime</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--purple-dim);color:var(--purple)">FILE</span>
+      <span class="endpoint-path">https://api.aaryavtech.online/storage/v1/</span>
+      <span class="endpoint-desc">File Storage API</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--pink-dim);color:var(--pink)">EDGE</span>
+      <span class="endpoint-path">https://api.aaryavtech.online/functions/v1/</span>
+      <span class="endpoint-desc">Edge Functions (Deno)</span>
+    </div>
+    <div class="endpoint-row">
+      <span class="method-badge" style="background:var(--green-dim);color:var(--green)">UI</span>
+      <span class="endpoint-path">https://supabase.aaryavtech.online</span>
+      <span class="endpoint-desc">Supabase Studio dashboard</span>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 3 — Code Examples (Tabbed)
+  ════════════════════════════════════════════════════ -->
+  <div class="section-label">
+    <h2>💻 Code Examples</h2>
+    <span class="tag" style="background:var(--orange-dim);color:var(--orange)">Copy-Paste Ready</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('tab-nextjs', this)">Next.js</button>
+    <button class="tab-btn" onclick="switchTab('tab-vite', this)">React / Vite</button>
+    <button class="tab-btn" onclick="switchTab('tab-node', this)">Node.js</button>
+    <button class="tab-btn" onclick="switchTab('tab-python', this)">Python</button>
+    <button class="tab-btn" onclick="switchTab('tab-flutter', this)">Flutter/Dart</button>
+  </div>
+
+  <!-- Next.js Tab -->
+  <div id="tab-nextjs" class="tab-content active">
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--blue-dim);color:var(--blue)">TS</span>
+          lib/supabase.ts
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-nextjs', this)">📋 Copy</button>
+      </div>
+      <pre id="code-nextjs"><span class="kw">import</span> { createClient } <span class="kw">from</span> <span class="str">'@supabase/supabase-js'</span>
+
+<span class="kw">const</span> <span class="var">supabaseUrl</span> = process.env.<span class="var">NEXT_PUBLIC_SUPABASE_URL</span>!
+<span class="kw">const</span> <span class="var">supabaseAnonKey</span> = process.env.<span class="var">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>!
+
+<span class="kw">export const</span> <span class="var">supabase</span> = <span class="fn">createClient</span>(<span class="var">supabaseUrl</span>, <span class="var">supabaseAnonKey</span>)
+
+<span class="cm">// Usage example — fetch data:</span>
+<span class="kw">const</span> { data, error } = <span class="kw">await</span> <span class="var">supabase</span>
+  .<span class="fn">from</span>(<span class="str">'your_table'</span>)
+  .<span class="fn">select</span>(<span class="str">'*'</span>)
+
+<span class="cm">// Auth example:</span>
+<span class="kw">await</span> <span class="var">supabase</span>.auth.<span class="fn">signInWithPassword</span>({
+  email: <span class="str">'user@example.com'</span>,
+  password: <span class="str">'password'</span>
+})</pre>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--green-dim);color:var(--green)">ENV</span>
+          .env.local
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-nextjs-env', this)">📋 Copy</button>
+      </div>
+      <pre id="code-nextjs-env"><span class="var">NEXT_PUBLIC_SUPABASE_URL</span>=<span class="val">https://api.aaryavtech.online</span>
+<span class="var">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>=<span class="val">YOUR_ANON_KEY</span></pre>
+    </div>
+  </div>
+
+  <!-- React / Vite Tab -->
+  <div id="tab-vite" class="tab-content">
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--blue-dim);color:var(--blue)">TS</span>
+          src/lib/supabase.ts
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-vite', this)">📋 Copy</button>
+      </div>
+      <pre id="code-vite"><span class="kw">import</span> { createClient } <span class="kw">from</span> <span class="str">'@supabase/supabase-js'</span>
+
+<span class="kw">export const</span> <span class="var">supabase</span> = <span class="fn">createClient</span>(
+  <span class="kw">import</span>.meta.env.<span class="var">VITE_SUPABASE_URL</span>,
+  <span class="kw">import</span>.meta.env.<span class="var">VITE_SUPABASE_ANON_KEY</span>
+)
+
+<span class="cm">// Realtime subscription (ride tracking, etc.):</span>
+<span class="var">supabase</span>
+  .<span class="fn">channel</span>(<span class="str">'driver-updates'</span>)
+  .<span class="fn">on</span>(<span class="str">'postgres_changes'</span>, {
+    event: <span class="str">'UPDATE'</span>,
+    schema: <span class="str">'public'</span>,
+    table: <span class="str">'drivers'</span>
+  }, (payload) => <span class="fn">console</span>.<span class="fn">log</span>(payload))
+  .<span class="fn">subscribe</span>()</pre>
+    </div>
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--green-dim);color:var(--green)">ENV</span>
+          .env
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-vite-env', this)">📋 Copy</button>
+      </div>
+      <pre id="code-vite-env"><span class="var">VITE_SUPABASE_URL</span>=<span class="val">https://api.aaryavtech.online</span>
+<span class="var">VITE_SUPABASE_ANON_KEY</span>=<span class="val">YOUR_ANON_KEY</span></pre>
+    </div>
+  </div>
+
+  <!-- Node.js Tab -->
+  <div id="tab-node" class="tab-content">
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--orange-dim);color:var(--orange)">JS</span>
+          supabase.js (server-side)
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-node', this)">📋 Copy</button>
+      </div>
+      <pre id="code-node"><span class="kw">const</span> { createClient } = <span class="fn">require</span>(<span class="str">'@supabase/supabase-js'</span>)
+
+<span class="cm">// Server-side client (can use service_role key)</span>
+<span class="kw">const</span> <span class="var">supabase</span> = <span class="fn">createClient</span>(
+  <span class="str">'https://api.aaryavtech.online'</span>,
+  process.env.<span class="var">SUPABASE_SERVICE_ROLE_KEY</span>  <span class="cm">// server only!</span>
+)
+
+<span class="cm">// Example: insert bypassing RLS</span>
+<span class="kw">const</span> { data, error } = <span class="kw">await</span> <span class="var">supabase</span>
+  .<span class="fn">from</span>(<span class="str">'orders'</span>)
+  .<span class="fn">insert</span>({ user_id: <span class="str">'...'</span>, amount: <span class="val">1500</span> })
+  .<span class="fn">select</span>()
+  .<span class="fn">single</span>()</pre>
+    </div>
+  </div>
+
+  <!-- Python Tab -->
+  <div id="tab-python" class="tab-content">
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--blue-dim);color:var(--blue)">PY</span>
+          supabase_client.py
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-python', this)">📋 Copy</button>
+      </div>
+      <pre id="code-python"><span class="cm"># pip install supabase</span>
+<span class="kw">from</span> supabase <span class="kw">import</span> create_client
+
+<span class="var">url</span> = <span class="str">"https://api.aaryavtech.online"</span>
+<span class="var">key</span> = <span class="str">"YOUR_ANON_KEY"</span>  <span class="cm"># or service_role for server</span>
+
+<span class="var">supabase</span> = <span class="fn">create_client</span>(<span class="var">url</span>, <span class="var">key</span>)
+
+<span class="cm"># Fetch data</span>
+<span class="var">response</span> = <span class="var">supabase</span>.table(<span class="str">"drivers"</span>).select(<span class="str">"*"</span>).execute()
+<span class="fn">print</span>(<span class="var">response</span>.data)
+
+<span class="cm"># Insert data</span>
+<span class="var">response</span> = <span class="var">supabase</span>.table(<span class="str">"drivers"</span>).insert({
+    <span class="str">"name"</span>: <span class="str">"Chirag"</span>,
+    <span class="str">"status"</span>: <span class="str">"available"</span>
+}).execute()</pre>
+    </div>
+  </div>
+
+  <!-- Flutter Tab -->
+  <div id="tab-flutter" class="tab-content">
+    <div class="code-block">
+      <div class="code-header">
+        <div class="code-filename">
+          <span class="lang-badge" style="background:var(--blue-dim);color:var(--blue)">DART</span>
+          main.dart
+        </div>
+        <button class="copy-btn" onclick="copyBlock('code-flutter', this)">📋 Copy</button>
+      </div>
+      <pre id="code-flutter"><span class="cm">// pubspec.yaml: supabase_flutter: ^2.0.0</span>
+<span class="kw">import</span> <span class="str">'package:supabase_flutter/supabase_flutter.dart'</span>;
+
+<span class="kw">void</span> <span class="fn">main</span>() <span class="kw">async</span> {
+  WidgetsFlutterBinding.<span class="fn">ensureInitialized</span>();
+
+  <span class="kw">await</span> Supabase.<span class="fn">initialize</span>(
+    url: <span class="str">'https://api.aaryavtech.online'</span>,
+    anonKey: <span class="str">'YOUR_ANON_KEY'</span>,
+  );
+
+  <span class="fn">runApp</span>(<span class="fn">MyApp</span>());
+}
+
+<span class="cm">// Access client anywhere:</span>
+<span class="kw">final</span> <span class="var">supabase</span> = Supabase.instance.client;
+
+<span class="cm">// Fetch data:</span>
+<span class="kw">final</span> data = <span class="kw">await</span> <span class="var">supabase</span>
+  .from(<span class="str">'drivers'</span>)
+  .select()
+  .eq(<span class="str">'status'</span>, <span class="str">'available'</span>);</pre>
+    </div>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 4 — AI Prompts
+  ════════════════════════════════════════════════════ -->
+  <div class="section-label">
+    <h2>🤖 AI Coder Prompts</h2>
+    <span class="tag" style="background:var(--purple-dim);color:var(--purple)">Paste into Cursor / Claude / ChatGPT</span>
+  </div>
+
+  <div class="alert alert-info">
+    <span class="alert-icon">💡</span>
+    <div>Copy any prompt below and paste it into <strong>Cursor AI, Claude, ChatGPT, GitHub Copilot, or Gemini</strong> to instantly set up Supabase in your project. Replace placeholders with your actual values.</div>
+  </div>
+
+  <!-- Prompt 1 — New project setup -->
+  <div class="prompt-box">
+    <span class="prompt-label">🚀 New Project — Full Setup</span>
+    I am using a self-hosted Supabase instance at <span class="highlight">https://api.aaryavtech.online</span>.
+
+    My project details:
+    - Supabase URL: <span class="highlight">https://api.aaryavtech.online</span>
+    - Anon Key: <span class="highlight">YOUR_ANON_KEY</span> (get from VPS: grep ANON_KEY /root/supabase/.env)
+    - Studio: <span class="highlight">https://supabase.aaryavtech.online</span>
+
+    Please set up Supabase in my [Next.js / React / Node.js] project:
+    1. Install @supabase/supabase-js
+    2. Create a supabase client file using the URL and anon key above from environment variables
+    3. Add the correct .env variables
+    4. Add .env to .gitignore
+    5. Show me an example of fetching data from a table and signing in a user
+
+    Do NOT use Supabase Cloud. This is a self-hosted instance — the URL is the same for all API calls.
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 2 — Realtime -->
+  <div class="prompt-box">
+    <span class="prompt-label">⚡ Realtime Subscription</span>
+    I have a self-hosted Supabase at <span class="highlight">https://api.aaryavtech.online</span>.
+
+    I need to add real-time updates to my app. Please:
+    1. Set up a Supabase realtime subscription on the table <span class="highlight">YOUR_TABLE_NAME</span>
+    2. Listen for INSERT, UPDATE, and DELETE events
+    3. Update my React state whenever a change happens
+    4. Properly clean up the subscription when the component unmounts
+    5. Add a note that I need to enable Replication for this table in Supabase Studio
+
+    The anon key is in my environment as <span class="highlight">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>.
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 3 — Auth -->
+  <div class="prompt-box">
+    <span class="prompt-label">🔐 Authentication Flow</span>
+    I'm using self-hosted Supabase at <span class="highlight">https://api.aaryavtech.online</span>.
+
+    Please implement complete authentication for my [Next.js App Router / React] app:
+    1. Sign up with email + password
+    2. Sign in with email + password
+    3. Sign out
+    4. Protect routes — redirect unauthenticated users to /login
+    5. Show the user's email in the header when logged in
+    6. Handle auth state changes with onAuthStateChange
+
+    My Supabase client is already configured in <span class="highlight">lib/supabase.ts</span>.
+    SMTP is configured on the server — emails will work.
+    Use the ANON KEY from <span class="highlight">NEXT_PUBLIC_SUPABASE_ANON_KEY</span> env var.
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 4 — Row Level Security -->
+  <div class="prompt-box">
+    <span class="prompt-label">🛡️ Row Level Security (RLS) Policies</span>
+    I have a self-hosted Supabase at <span class="highlight">https://api.aaryavtech.online</span>.
+
+    I need to set up Row Level Security for my <span class="highlight">YOUR_TABLE_NAME</span> table. Please write SQL policies so that:
+    1. Users can only READ their own rows (where user_id = auth.uid())
+    2. Users can INSERT rows where user_id is set to their own auth.uid()
+    3. Users can UPDATE and DELETE only their own rows
+    4. Admins (users with role 'admin' in a separate profiles table) can read ALL rows
+
+    Provide the complete SQL to:
+    - Enable RLS on the table
+    - Create each policy
+    - Test it works correctly
+
+    I will run this SQL in Supabase Studio → SQL Editor at <span class="highlight">https://supabase.aaryavtech.online</span>.
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 5 — Ride tracking -->
+  <div class="prompt-box">
+    <span class="prompt-label">🚗 Ride Tracking / Driver Status App</span>
+    I'm building a ride-tracking/driver management app using self-hosted Supabase at <span class="highlight">https://api.aaryavtech.online</span>.
+
+    Please help me:
+    1. Design the database schema for:
+       - drivers (id, name, status: available/busy/offline, lat, lng, updated_at)
+       - rides (id, driver_id, passenger_id, pickup_lat, pickup_lng, status, created_at)
+    2. Write the SQL to create these tables with proper RLS policies
+    3. Create a React component that shows a live driver map that updates in real-time using Supabase Realtime subscriptions
+    4. Show how to update driver location every 5 seconds from the driver's device
+
+    Supabase URL: <span class="highlight">https://api.aaryavtech.online</span>
+    Anon key env var: <span class="highlight">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 6 — Storage -->
+  <div class="prompt-box">
+    <span class="prompt-label">📁 File Upload with Supabase Storage</span>
+    I'm using self-hosted Supabase Storage at <span class="highlight">https://api.aaryavtech.online/storage/v1/</span>.
+
+    Please implement file upload in my React app:
+    1. Create a Supabase Storage bucket called <span class="highlight">uploads</span> (I'll do this in Studio)
+    2. Build a file upload component with drag-and-drop
+    3. Show upload progress
+    4. Display the uploaded file's public URL after upload
+    5. List all files the current user has uploaded
+    6. Add delete functionality
+
+    Use the anon key from <span class="highlight">NEXT_PUBLIC_SUPABASE_ANON_KEY</span>.
+    The storage URL is part of the same Supabase URL: <span class="highlight">https://api.aaryavtech.online</span>.
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <!-- Prompt 7 — Edge Functions -->
+  <div class="prompt-box">
+    <span class="prompt-label">⚙️ Edge Functions (Deno)</span>
+    I have self-hosted Supabase with Edge Functions support at <span class="highlight">https://api.aaryavtech.online/functions/v1/</span>.
+
+    Please:
+    1. Create a Supabase Edge Function called <span class="highlight">send-notification</span> that accepts a POST request with { user_id, message } and sends a push notification or email
+    2. Show how to deploy it: the functions go in <span class="highlight">/root/supabase/volumes/functions/</span> directory on the VPS
+    3. Show how to call it from my frontend using the Supabase client
+    4. Show how to protect it with JWT verification
+
+    Supabase URL: <span class="highlight">https://api.aaryavtech.online</span>
+    Functions are in Deno (TypeScript).
+    <button class="copy-btn" onclick="copyPrompt(this)" style="margin-top:1rem;">📋 Copy Prompt</button>
+  </div>
+
+  <hr class="divider" />
+
+  <!-- ═══════════════════════════════════════════════════
+       SECTION 5 — Quick Checks
+  ════════════════════════════════════════════════════ -->
+  <div class="section-label">
+    <h2>✅ Quick Connectivity Check</h2>
+    <span class="tag" style="background:var(--green-dim);color:var(--green)">Test Live</span>
+  </div>
+
+  <div class="grid-3" style="margin-bottom:1.5rem;">
+    <div class="card" style="text-align:center;">
+      <div class="card-icon" style="background:var(--green-dim);margin:0 auto 0.875rem;">🟢</div>
+      <h3>REST API</h3>
+      <p style="margin-bottom:1rem;">Check PostgREST is responding</p>
+      <button class="copy-btn" style="margin:0 auto;" onclick="testEndpoint('https://api.aaryavtech.online/rest/v1/', 'rest-result')">Test →</button>
+      <div id="rest-result" style="margin-top:0.75rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted);"></div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon" style="background:var(--blue-dim);margin:0 auto 0.875rem;">🔐</div>
+      <h3>Auth API</h3>
+      <p style="margin-bottom:1rem;">Check GoTrue is responding</p>
+      <button class="copy-btn" style="margin:0 auto;" onclick="testEndpoint('https://api.aaryavtech.online/auth/v1/health', 'auth-result')">Test →</button>
+      <div id="auth-result" style="margin-top:0.75rem;font-size:0.78rem;font-family:'JetBrains Mono',monospace;color:var(--text-muted);"></div>
+    </div>
+    <div class="card" style="text-align:center;">
+      <div class="card-icon" style="background:var(--purple-dim);margin:0 auto 0.875rem;">🌐</div>
+      <h3>Studio</h3>
+      <p style="margin-bottom:1rem;">Open Supabase Studio</p>
+      <a href="https://supabase.aaryavtech.online" target="_blank">
+        <button class="copy-btn" style="margin:0 auto;">Open →</button>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<!-- Footer -->
+<footer>
+  Self-hosted Supabase · <a href="https://supabase.aaryavtech.online" target="_blank">aaryavtech.online</a> ·
+  <a href="https://supabase.com/docs/guides/self-hosting" target="_blank">Supabase Self-Hosting Docs</a>
+</footer>
+
+<script>
+  // ── Tab switching ──
+  function switchTab(id, btn) {
+    document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'))
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'))
+    document.getElementById(id).classList.add('active')
+    btn.classList.add('active')
+  }
+
+  // ── Copy text ──
+  function copyText(text, btn) {
+    navigator.clipboard.writeText(text).then(() => {
+      const orig = btn.innerHTML
+      btn.innerHTML = '✅ Copied!'
+      btn.classList.add('copied')
+      setTimeout(() => { btn.innerHTML = orig; btn.classList.remove('copied') }, 2000)
+    })
+  }
+
+  // ── Copy code block ──
+  function copyBlock(id, btn) {
+    const el = document.getElementById(id)
+    const text = el.innerText
+    copyText(text, btn)
+  }
+
+  // ── Copy AI prompt ──
+  function copyPrompt(btn) {
+    const box = btn.closest('.prompt-box')
+    // Get text content, excluding the button itself
+    const clone = box.cloneNode(true)
+    clone.querySelector('button')?.remove()
+    clone.querySelector('.prompt-label')?.remove()
+    const text = clone.innerText.trim()
+    copyText(text, btn)
+  }
+
+  // ── Edit ANON key inline ──
+  function editKey(id) {
+    const el = document.getElementById(id)
+    const current = el.textContent
+    const newVal = prompt('Paste your ANON_KEY here:', current === 'PASTE_YOUR_ANON_KEY_HERE' ? '' : current)
+    if (newVal && newVal.trim()) {
+      el.textContent = newVal.trim()
+      el.classList.remove('secret')
+    }
+  }
+
+  // ── Test endpoint connectivity ──
+  async function testEndpoint(url, resultId) {
+    const el = document.getElementById(resultId)
+    el.textContent = 'Testing...'
+    el.style.color = 'var(--text-muted)'
+    try {
+      const res = await fetch(url, {
+        headers: { 'apikey': document.getElementById('anon-key-val')?.textContent || '' }
+      })
+      if (res.ok || res.status === 200) {
+        el.textContent = '✅ HTTP ' + res.status + ' — Online!'
+        el.style.color = 'var(--green)'
+      } else {
+        el.textContent = '⚠️ HTTP ' + res.status
+        el.style.color = 'var(--orange)'
+      }
+    } catch (e) {
+      el.textContent = '❌ Unreachable (deploy first or check DNS)'
+      el.style.color = '#ef4444'
+    }
+  }
+</script>
+</body>
+</html>
